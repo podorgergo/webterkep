@@ -1,0 +1,1311 @@
+<!doctype html>
+<html>
+	<head>
+		<title>A Kárpát-medencei magyar szórványok lehatárolási lehetőségei és térképezése</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="user-scalable=no" />
+		<link rel="stylesheet" href="leaflet/leaflet.css" />
+		<script src="leaflet/leaflet.js"></script>
+		<style>
+		
+			html, body {
+				height: 100%; 
+				margin: 0;
+			}
+			
+			#terkep_helye {
+                position: absolute;
+                top: 60px; bottom: 0;
+                width: 100%;}
+		
+			#kezeloszervek {
+				position:absolute;
+				top: 0; right: 0;
+				background: rgba(192,192,192,0.2);
+				z-index: 100;
+				border: solid 2px black;
+			}
+			
+			#modszer {
+				position:absolute;
+				top: 0; left: 0;
+				background: rgba(192,192,192,0.2);
+				z-index: 100;
+				border: solid 2px black;
+			}
+			
+			
+			.leaflet-popup-content-wrapper,	
+			.leaflet-popup-tip {
+				background: rgb(160, 160, 160);
+				border: solid 2px black;
+			}
+			
+			.leaflet-popup-content {
+				color: black;
+				font-weight: bold;
+				font-family: Arial;
+				font-size: 12px;
+				font-style: normal;
+				background: rgb(160, 160, 160);
+			}
+			
+			h1 {
+				position: absolute;
+                top: 22px;
+                font-size: 12;               
+                margin: 0;
+			}
+            
+            @media(max-width: 950px) {
+                h1 {
+                    font-size: 3vw;
+                    margin-top: 1vw;
+                }
+            }
+			
+            .szinvalto:hover {
+                fill: yellow;
+                fill-opacity: 0.7;
+            }
+		</style>
+	</head>
+	<body>
+		<h1>A Kárpát-medencei magyar szórványok lehatárolási lehetőségei és térképezése</h1>
+		<div id="terkep_helye"></div>
+		<div id="kezeloszervek">			
+			Település keresése: <input type="text" id="keresendo" />
+			<input type="button" value="Keresés" onclick="keres()" />					
+		</div>
+		
+		
+		<!--label for="modszer" placeholder="Szórványlehatárolási módszer">Szórványlehatárolási módszer:</label-->
+		<select name="Szórványlehatárolási módszer" autocomplete="off" id="modszer" onchange="modszervalt(this.value)">
+			<option value="valami" disabled>Szórványlehatárolási módszer</option>
+			<option value="int">Intézményi ellátottság</option>
+			<option value="nhusz">Magyar nemzetiségűek aránya maximum 20%</option>
+			<option value="ahusz">Magyar anyanyelvűek aránya maximum 20%</option>
+			<option value="anh"> ANH módszer</option>
+			<option value="30_300_n"> Magyar nemzetiségűek száma <=300 ÉS Magyar nemzetiségűek aránya <= 30% </option>
+			<option value="30_300_a"> Magyar anyanyelvűek száma <=300 ÉS Magyar anyanyelvűek aránya <= 30% </option>
+			<option value="alap">Alaphelyzetbe állítás</option>
+		</select>
+
+	
+		<script>
+                        
+			/* Térképvászon létrehozása */
+			var map=L.map('terkep_helye').setView([47.15, 20.5],7);
+
+			/* OSM réteg */			
+			var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+				maxZoom: 20,
+                opacity: 0.75,
+				attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+			});
+						
+			/* Google Terrain */
+			 var googleTerrain = L.tileLayer('http://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',{
+				maxZoom: 20,
+				subdomains:['mt0','mt1','mt2','mt3'],
+				attribution: ' &copy; Google Terrain 2022',
+			})
+	
+			/* Google műholdkép */			
+			var googleSat = L.tileLayer('http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+				maxZoom: 25,
+                subdomains:['mt0','mt1','mt2','mt3'],
+				attribution: 'Térképréteg forrása: &copy; Google Satellite 2022',
+			}).addTo(map);
+
+
+			
+			document.getElementById('modszer').selectedIndex=0;
+            						
+			var tematikus = L.featureGroup().addTo(map);
+			
+			/* intézményi ellátottsághoz köthető rétegek */
+                            
+            var x=new XMLHttpRequest();                                
+            x.open('get','Szlovakia_int.geojson',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var szlovakiaintezmeny=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popup);
+			
+			var x=new XMLHttpRequest();                                
+            x.open('get','Szlovakia_int_mikro.geojson',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var szlovakiaintezmenymikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popup);
+			
+			var x=new XMLHttpRequest();                                
+            x.open('get','Szlovakia_int_tomb.geojson',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var szlovakiaintezmenytomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popup);
+			
+						
+            
+            var x=new XMLHttpRequest();                                
+            x.open('get','Erdely_int.geojson',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var erdelyintezmeny=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupErdely);
+			
+			var x=new XMLHttpRequest();                                
+            x.open('get','Erdely_int_mikro.geojson',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var erdelyintezmenymikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupErdely);
+			
+			var x=new XMLHttpRequest();                                
+            x.open('get','Erdely_int_tomb.geojson',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var erdelyintezmenytomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupErdely);
+			
+						
+            
+            var x=new XMLHttpRequest();                                
+            x.open('get','Karpatalja_int.geojson',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var karpataljaintezmeny=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+			
+			var x=new XMLHttpRequest();                                
+            x.open('get','Karpatalja_int_mikro.geojson',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var karpataljaintezmenymikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+			
+			var x=new XMLHttpRequest();                                
+            x.open('get','Karpatalja_int_tomb.geojson',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var karpataljaintezmenytomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+			
+			
+						
+            
+            var x=new XMLHttpRequest();                                
+            x.open('get','Vajdasag_int.geojson',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var vajdasagintezmeny=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupVajdasag);
+			
+			var x=new XMLHttpRequest();                                
+            x.open('get','Vajdasag_int_mikro.geojson',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var vajdasagintezmenymikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupVajdasag);
+			
+			var x=new XMLHttpRequest();                                
+            x.open('get','Vajdasag_int_tomb.geojson',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var vajdasagintezmenytomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupVajdasag);
+			
+						
+                            
+            var x=new XMLHttpRequest();                                
+            x.open('get','Burgenland_int.geojson',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var burgenlandintezmeny=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupAusztria);
+			
+			
+			var x=new XMLHttpRequest();                                
+            x.open('get','Burgenland_int_mikro.geojson',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var burgenlandintezmenymikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupAusztria);
+			
+			var x=new XMLHttpRequest();                                
+            x.open('get','Burgenland_int_tomb.geojson',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var burgenlandintezmenytomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupAusztria);
+			
+			
+			
+			           
+            /*var x=new XMLHttpRequest();                                
+            x.open('get','Szlovenia10_01.json',false);
+            x.send();
+            var d=JSON.parse(x.responseText);
+            var szloveniaintezmeny=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "magenta", fillOpacity:0.5}).bindPopup(popupSzlovenia);*/
+			
+			/* intézményi ellátottság rétegek vége */
+						           
+					                                 
+			/* Nemzetiségi max 20% módszer */
+						
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovakia_n_20_jav.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovakian=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popup);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovakia_n_20_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovakiat=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popup);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovakia_n_20_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovakiamikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popup);
+				
+				
+			
+				var x=new XMLHttpRequest();                                
+				x.open('get','Erdely_n_20_jav.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var erdelyn=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupErdely);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Erdely_n_20_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var erdelytomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupErdely);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Erdely_n_20_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var erdelymikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupErdely);
+				
+				
+			
+				var x=new XMLHttpRequest();                                
+				x.open('get','Karpatalja_n_20.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var karpataljan=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Karpatalja_n_20_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var karpataljatomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Karpatalja_n_20_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var karpataljamikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+				
+			
+			
+				var x=new XMLHttpRequest();                                
+				x.open('get','Vajdasag_n_20_jav.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var vajdasagn=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupVajdasag);
+								
+				var x=new XMLHttpRequest();                                
+				x.open('get','Vajdasag_n_20_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var vajdasagmikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupVajdasag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Vajdasag_n_20_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var vajdasagtomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupVajdasag);
+												
+			
+				/*var x=new XMLHttpRequest();                                
+				x.open('get','Burgenland_n_20.json',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var burgenlandn=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "white", fillOpacity:0.5}).bindPopup(popupAusztria);*/
+
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovenia_n_20.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovenian=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupSzlovenia);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovenia_n_20_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szloveniamikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupSzlovenia);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovenia_n_20_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szloveniatomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupSzlovenia);
+				
+								
+												
+				var x=new XMLHttpRequest();                                
+				x.open('get','murakoz_dravakoz_n_20.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var murakozdravakozn=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupHorvatorszag);
+							
+				var x=new XMLHttpRequest();                                
+				x.open('get','murakoz_dravakoz_n_20_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var murakozdravakozmikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupHorvatorszag);
+
+				var x=new XMLHttpRequest();                                
+				x.open('get','murakoz_dravakoz_n_20_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var murakozdravakoztomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupHorvatorszag);
+				
+			/* Nemzetiségi max 20% módszer vége */
+			
+									
+			/* Anyanyelvi max 20% módszer */
+					
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovakia_a_20_jav.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovakiaa=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popup);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovakia_a_20_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovakiaamikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popup);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovakia_a_20_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovakiaatomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popup);
+				
+				
+								
+			
+				var x=new XMLHttpRequest();                                
+				x.open('get','Erdely_a_20_jav.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var erdelya=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupErdely);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Erdely_a_20_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var erdelyamikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupErdely);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Erdely_a_20_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var erdelyatomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupErdely);
+								
+				
+			
+				var x=new XMLHttpRequest();                                
+				x.open('get','Karpatalja_a_20.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var karpataljaa=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Karpatalja_a_20_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var karpataljaamikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Karpatalja_a_20_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var karpataljaatomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+				
+				
+			
+				var x=new XMLHttpRequest();                                
+				x.open('get','Vajdasag_a_20.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var vajdasaga=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupVajdasag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Vajdasag_a_20_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var vajdasagamikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupVajdasag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Vajdasag_a_20_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var vajdasagatomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupVajdasag);
+				
+				
+			
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovenia_a_20.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szloveniaa=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupSzlovenia);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovenia_a_20_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szloveniaamikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupSzlovenia);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovenia_a_20_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szloveniaatomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupSzlovenia);
+				
+				
+							
+				var x=new XMLHttpRequest();                                
+				x.open('get','murakoz_dravakoz_a_20.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var murakozdravakoza=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupHorvatorszag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','murakoz_dravakoz_a_20_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var murakozdravakozamikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupHorvatorszag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','murakoz_dravakoz_a_20_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var murakozdravakozatomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupHorvatorszag);
+			
+			/* Anyanyelvi max 20%-os módszer vége */
+			
+			
+			/* ANH mutatóhoz köthető rétegek */ 
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovakia_anh.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovakiaanh=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popup);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovakia_anh_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovakiaanhmikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popup);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovakia_anh_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovakiaanhtomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popup);
+				
+				
+						
+				var x=new XMLHttpRequest();                                
+				x.open('get','Erdely_anh.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var erdelyanh=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupErdely);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Erdely_anh_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var erdelyanhmikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupErdely);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Erdely_anh_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var erdelyanhtomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupErdely);
+																				
+				
+							
+				var x=new XMLHttpRequest();                                
+				x.open('get','Karpatalja_anh.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var karpataljaanh=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Karpatalja_anh_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var karpataljaanhmikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Karpatalja_anh_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var karpataljaanhtomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+				
+				
+															
+				var x=new XMLHttpRequest();                                
+				x.open('get','Vajdasag_anh.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var vajdasaganh=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupVajdasag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Vajdasag_anh_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var vajdasaganhmikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupVajdasag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Vajdasag_anh_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var vajdasaganhtomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupVajdasag);
+				
+							
+				var x=new XMLHttpRequest();                                
+				x.open('get','murakoz_dravakoz_anh.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var murakozdravakozanh=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupHorvatorszag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','murakoz_dravakoz_anh_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var murakozdravakozanhmikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupHorvatorszag);
+				
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovenia_anh_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szloveniaanhmikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupSzlovenia);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovenia_anh_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szloveniaanhtomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupSzlovenia);
+				
+				
+				
+				
+				
+				
+				
+			/* ANH rétegek vége */
+			
+			
+			/* max 300 fő + arány max 30% (nemzetiség!!!) rétegek */
+			
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovakia_30_300.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovakia30_300_n=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popup);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovakia_30_300_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovakia30_300_n_mikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popup);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovakia_30_300_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovakia30_300_n_tomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popup);
+				
+									
+				var x=new XMLHttpRequest();                                
+				x.open('get','Erdely_30_300_n.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var erdely30_300_n=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupErdely);
+				
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Erdely_30_300_n_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var erdely30_300_n_mikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupErdely);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Erdely_30_300_n_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var erdely30_300_n_tomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupErdely);
+				
+				
+				
+			
+				var x=new XMLHttpRequest();                                
+				x.open('get','Karpatalja_30_300_n.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var karpatalja30_300_n=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Karpatalja_30_300_n_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var karpatalja30_300_n_mikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Karpatalja_30_300_n_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var karpatalja30_300_n_tomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+				
+															
+				var x=new XMLHttpRequest();                                
+				x.open('get','Vajdasag_30_300_n.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var vajdasag30_300_n=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupVajdasag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Vajdasag_30_300_n_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var vajdasag30_300_n_mikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupVajdasag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Vajdasag_30_300_n_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var vajdasag30_300_n_tomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupVajdasag);
+								
+			
+				var x=new XMLHttpRequest();                                
+				x.open('get','murakoz_dravakoz_30_300_n.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var murakozdravakoz30_300_n=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupHorvatorszag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','murakoz_dravakoz_30_300_n_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var murakozdravakoz30_300_n_mikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupHorvatorszag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','murakoz_dravakoz_30_300_n_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var murakozdravakoz30_300_n_tomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupHorvatorszag);
+				
+
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovenia_30_300_n.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovenia30_300_n=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupSzlovenia);
+				
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovenia_30_300_n_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovenia30_300_n_mikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupSzlovenia);
+				
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovenia_30_300_n_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovenia30_300_n_tomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupSzlovenia);
+				/*var x=new XMLHttpRequest();                                
+				x.open('get','burgenland_30_300_n.json',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var burgenland30_300_n=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "olive", fillOpacity:0.5}).bindPopup(popupAusztria);	*/
+				
+			/* max 300 fő + arány max 30% (nemzetiség!!!) rétegek vége */
+			
+			
+			/* max 300 fő + arány max 30% (anyanyelv!!!) rétegek */			
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovakia_30_300_a.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovakia30_300_a=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popup);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovakia_30_300_a_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovakia30_300_a_mikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popup);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovakia_30_300_a_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovakia30_300_a_tomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popup);
+				
+				
+											
+				var x=new XMLHttpRequest();                                
+				x.open('get','Erdely_30_300_a.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var erdely30_300_a=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupErdely);
+								
+				var x=new XMLHttpRequest();                                
+				x.open('get','Erdely_30_300_a_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var erdely30_300_a_mikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupErdely);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Erdely_30_300_a_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var erdely30_300_a_tomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupErdely);
+				
+				
+			
+				var x=new XMLHttpRequest();                                
+				x.open('get','Karpatalja_30_300_a.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var karpatalja30_300_a=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Karpatalja_30_300_a_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var karpatalja30_300_a_mikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Karpatalja_30_300_a_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var karpatalja30_300_a_tomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupKarpatalja);
+				
+				
+				
+							
+				var x=new XMLHttpRequest();                                
+				x.open('get','Vajdasag_30_300_a.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var vajdasag30_300_a=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupVajdasag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Vajdasag_30_300_a_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var vajdasag30_300_a_mikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupVajdasag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Vajdasag_30_300_a_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var vajdasag30_300_a_tomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupVajdasag);
+				
+								
+			
+				var x=new XMLHttpRequest();                                
+				x.open('get','murakoz_dravakoz_30_300_a.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var murakozdravakoz30_300_a=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupHorvatorszag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','murakoz_dravakoz_30_300_a_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var murakozdravakoz30_300_a_mikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupHorvatorszag);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','murakoz_dravakoz_30_300_a_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var murakozdravakoz30_300_a_tomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupHorvatorszag);
+
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovenia_30_300_a.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovenia30_300_a=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "red", fillOpacity:0.5}).bindPopup(popupSzlovenia);
+
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovenia_30_300_a_mikro.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovenia30_300_a_mikro=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#FFFFFF", fillOpacity:0.5}).bindPopup(popupSzlovenia);
+				
+				var x=new XMLHttpRequest();                                
+				x.open('get','Szlovenia_30_300_a_tomb.geojson',false);
+				x.send();
+				var d=JSON.parse(x.responseText);
+				var szlovenia30_300_a_tomb=L.geoJSON(d, {className: 'szinvalto', color: "black", weight: 0.2, fillColor: "#728FCE", fillOpacity:0.5}).bindPopup(popupSzlovenia);
+				
+			/* max 300 fő + arány max 30% (anyanyelv!!!) rétegek vége */
+						
+			
+			function keres() {
+				var település=document.getElementById('keresendo').value;
+				var url='https://nominatim.openstreetmap.org/search?format=json&q='+település
+				fetch(url).then(r=>r.json()).then(d=>{
+					if (d.length==0)
+						alert('Nincs találat!');
+					else {
+						L.popup().setLatLng([d[0].lat,d[0].lon]).setContent(d[0].display_name).openOn(map);
+                        var bb=d[0].boundingbox;
+						map.fitBounds([[bb[0],bb[2]],[bb[1],bb[3]]]);
+					}
+				});
+			}
+			
+		
+			/* attribútumfüggő popup függvények */
+			function popup(layer) {
+                var p=layer.feature.properties;   
+				return	"Településnév: "+p.magyar_nev+"<br/>Szlovák név: "+p.telepulesn+"<br/>Járás: "+p.jaras_hun+"<br/>Kerület: "+p.kerulet+"<br/>Népesség: "+p.nepesseg_+" fő"+"<br/>Szlovák nemzetiségűek száma: "+p.n_szlovak+" fő"+"<br/>Szlovák nemzetiségűek aránya: "+p.SK_szazale.toFixed(2)+" %"+"<br/>Szlovák anyanyelvűek száma: "+p.a_szlovak+" fő"+"<br/>Szlovák anyanyelvűek aránya: "+p.SK_szaza_1.toFixed(2)+" %"+"<br/>Magyar nemzetiségűek száma: "+p.n_magyar+" fő"+"<br/>Magyar anyanyelvűek száma: "+p.a_magyar+" fő"+"<br/>Magyar nemzetiségűek aránya: "+p.M_szazalek.toFixed(2)+" %"+"<br/>Magyar anyanyelvűek aránya: "+p.M_szazal_1.toFixed(2)+" %"+"<br/>Magyar óvoda: "+p.ovi_log+"<br/>Magyar iskolai oktatás: "+p.iskola_log+"<br/>ANH mutató: "+p.ANH;
+            }
+						
+			function popupAusztria(layer) {
+                var a=layer.feature.properties;   
+				return	"Településnév: "+a.magyarnev+"<br/>Német név: "+a.LAU_LABEL+"<br/>Járás: "+a.jaras+"<br/>Tartomány: "+a.tartomany+"<br/>Ország: "+a.orszag+"<br/>Népesség: "+a.osszesen+" fő"+"<br/>Németek száma: "+a.nemet2001+" fő"+"<br/>Magyarok száma: "+a.magyar2001+" fő"+"<br/>Magyarok aránya: "+a.magyar_sza+" %"+"<br/>Magyar óvoda: "+a.ovi_log+"<br/>Magyar iskolai oktatás: "+a.iskola_log;				
+            }
+						
+			function popupErdely(layer) {
+                var e=layer.feature.properties;   
+				return	"Községnév: "+e.magynev199+"<br/>Román név: "+e.LAU_LABEL+"<br/>Megye: "+e.Megyenev+"<br/>Országrész: "+e.orszagresz+"<br/>Ország: "+e.orszag+"<br/>Népesség: "+e.osszes+" fő"+"<br/>Román nemzetiségűek száma: "+e.roman_n+" fő"+"<br/>Román nemzetiségűek aránya: "+e.roman_n_sz+" %"+"<br/>Román anyanyelvűek száma: "+e.roman_a+" fő"+"<br/>Román anyanyelvűek aránya: "+e.roman_a_sz+" %"+"<br/>Magyar nemzetiségűek száma: "+e.magyar_n+" fő"+"<br/>Magyar anyanyelvűek száma: "+e.magyar_a+" fő"+"<br/>Magyar nemzetiségűek aránya: "+e.magyar_n_s+" %"+"<br/>Magyar anyanyelvűek aránya: "+e.magyar_a_s+" %"+"<br/>Magyar óvoda: "+e.ovi_log+"<br/>Magyar iskolai oktatás: "+e.iskola_log+"<br/>ANH mutató: "+e.ANH;
+            }
+
+			function popupKarpatalja(layer) {
+                var k=layer.feature.properties;   
+				return	"Településnév: "+k.magyar_nev+"<br/>Ukrán név: "+k.ukran_nev+"<br/>Járás: "+k.jaras+"<br/>Terület: "+k.terulet+"<br/>Ország: "+k.orszag+"<br/>Népesség: "+k.osszesen+" fő"+"<br/>Magyar nemzetiségűek száma: "+k.magyar_N+" fő"+"<br/>Magyar anyanyelvűek száma: "+k.magyar_A+" fő"+"<br/>Magyar nemzetiségűek aránya: "+k.magyar_n_s+" %"+"<br/>Magyar anyanyelvűek aránya: "+k.magyar_a_s+" %"+"<br/>Magyar óvoda: "+k.ovi_log+"<br/>Magyar iskolai oktatás: "+k.iskola_log+"<br/>ANH mutató: "+k.ANH;
+            }
+						
+			function popupVajdasag(layer) {
+                var v=layer.feature.properties;   
+				return	"Településnév: "+v.magyar_nev+"<br/>Latin betűs szerb név: "+v.latin_nev+"<br/>Cirill betűs szerb név: "+v.name+"<br/>Körzet: "+v.korzet+"<br/>Tartomány: "+v.tartomany+"<br/>Ország: "+v.orszag+"<br/>Népesség: "+v.osszesen+" fő"+"<br/>Magyar nemzetiségűek száma: "+v.magyar_N+" fő"+"<br/>Magyar anyanyelvűek száma: "+v.magyar_A+" fő"+"<br/>Magyar nemzetiségűek aránya: "+v.magyar_sza+" %"+"<br/>Magyar anyanyelvűek aránya: "+v.magyar_s_1+" %"+"<br/>Magyar óvoda: "+v.ovi_log+"<br/>Magyar iskolai oktatás: "+v.iskola_log+"<br/>ANH mutató: "+v.ANH;
+            }
+
+			function popupSzlovenia(layer) {
+				var sz=layer.feature.properties;
+				return	"Településnév: "+sz.magyar+"<br/>Szlovén név: "+sz.LAU_LABEL+"<br/>Régió: "+sz.regio+"<br/>Ország: "+sz.orszag+"<br/>Népesség: "+sz.osszesen+" fő"+"<br/>Magyar nemzetiségűek száma: "+sz.magyar_N+" fő"+"<br/>Magyar anyanyelvűek száma: "+sz.magyar_A+" fő"+"<br/>Magyar nemzetiségűek aránya: "+sz.N_szazalek+" %"+"<br/>Magyar anyanyelvűek aránya: "+sz.A_szazalek+" %"+"<br/>ANH mutató: "+sz.ANH;
+			}
+			
+			function popupHorvatorszag(layer) {
+				var h=layer.feature.properties;
+				return	"Településnév: "+h.magynev+"<br/>Horvát név: "+h.LAU_LABEL+"<br/>Megye: "+h.megye+"<br/>Ország: "+h.orszag+"<br/>Népesség: "+h.total+" fő"+"<br/>Magyar nemzetiségűek száma: "+h.magyarok_N+" fő"+"<br/>Magyar anyanyelvűek száma: "+h.magyar_A+" fő"+"<br/>Magyar nemzetiségűek aránya: "+h.magyarok_s+" %"+"<br/>Magyar anyanyelvűek aránya: "+h.magyar_sza+" %"+"<br/>ANH mutató: "+h.ANH;
+			}			
+			/* popup függvények vége */
+			
+			
+			/* Különböző országokhoz tartozó alaprétegek, melyek a térkép betöltésekor válnak láthatóvá */
+			/* szlovákiai rész */
+			var szlovakia=L.layerGroup().addTo(map);
+			
+			var x=new XMLHttpRequest();                                
+			x.open('get','Szlovakia_teljes_jav_jav.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var szlovakia1=L.geoJSON(d, {className: 'szinvalto', weight: 0.2, color: "black" /*color: "#837E7C" granite*/, fillOpacity:0}).addTo(szlovakia).bindPopup(popup);
+						
+			var x=new XMLHttpRequest();                                
+			x.open('get','Szlovakia_jarasok1.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var szlovakia2=L.geoJSON(d, {weight: 0.6, color: "black" /*color: "#52595D" iron gray*/}).addTo(szlovakia);
+						
+			var x=new XMLHttpRequest();                                
+			x.open('get','Szlovakia_keruletek.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var szlovakia3=L.geoJSON(d, {weight: 1, color: "black" /*color: "#3D3C3A" iridium*/}).addTo(szlovakia);
+						
+			var x=new XMLHttpRequest();                                
+			x.open('get','Szlovakia_korvonal.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var szlovakia4=L.geoJSON(d, {weight: 1.2, color: "black"}).addTo(szlovakia);
+						
+			/* idáig tartott a szlovákiai rész */
+			
+			
+			/* romániai rész */
+			var romania=L.layerGroup().addTo(map);
+			var x=new XMLHttpRequest();                                
+			x.open('get','Erdely_vegleges_javitott.geojson',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var romania1=L.geoJSON(d, {className: 'szinvalto', weight: 0.2, color: "black", fillOpacity:0}).addTo(romania).bindPopup(popupErdely);
+					
+			var x=new XMLHttpRequest();                                
+			x.open('get','Erdely_megyek1.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var romania2=L.geoJSON(d, {weight: 1, color:"black"}).addTo(romania);
+			
+			var x=new XMLHttpRequest();                                
+			x.open('get','Erdely_orszaghatar.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var romania3=L.geoJSON(d, {weight: 1.2, color: "black"}).addTo(romania);
+						
+			/* romániai rész vége */
+				
+			
+			/* Kárpátalja */
+			var karpatalja = L.layerGroup().addTo(map)
+			
+			var x=new XMLHttpRequest();                                
+			x.open('get','Karpatalja_vegleges_jav.geojson',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var karpatalja1=L.geoJSON(d, {className: 'szinvalto', weight: 0.2, color: "black", fillOpacity:0}).addTo(karpatalja).bindPopup(popupKarpatalja);
+			
+						
+			var x=new XMLHttpRequest();                                
+			x.open('get','Karpatalja_jarasok.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var karpatalja2=L.geoJSON(d, {weight: 0.6, color: "black", fillOpacity:0}).addTo(karpatalja);
+			
+			
+			var x=new XMLHttpRequest();                                
+			x.open('get','Karpatalja_hatarvonal.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var karpatalja3=L.geoJSON(d, {weight: 1, color: "black"}).addTo(karpatalja);
+			
+			var x=new XMLHttpRequest();                                
+			x.open('get','Karpatalja_orszaghatar.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var karpatalja4=L.geoJSON(d, {weight: 1.2, color: "black"}).addTo(karpatalja);
+					
+			/* Kárpátalja vége */
+			
+			
+			/* Vajdaság */
+			
+			var vajdasag = L.layerGroup().addTo(map)
+			
+			var x=new XMLHttpRequest();                                
+			x.open('get','Vajdasag_vegleges_jav.geojson',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var vajdasag1=L.geoJSON(d, {className: 'szinvalto', weight: 0.2, color: "black", fillOpacity:0}).addTo(vajdasag).bindPopup(popupVajdasag);
+			
+			var x=new XMLHttpRequest();                                
+			x.open('get','Vajdasag_korzetek.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var vajdasag2=L.geoJSON(d, {weight: 0.6, color: "black", fillOpacity:0}).addTo(vajdasag);
+			
+			var x=new XMLHttpRequest();                                
+			x.open('get','Vajdasag_tartomanyhatar.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var vajdasag3=L.geoJSON(d, {weight: 1, color: "black", fillOpacity:0}).addTo(vajdasag);
+			
+			var x=new XMLHttpRequest();                                
+			x.open('get','Vajdasag_orszaghatar.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var vajdasag4=L.geoJSON(d, {weight: 1.2, color: "black", fillOpacity:0}).addTo(vajdasag);
+						
+			/* Vajdaság vége */
+		
+			
+			/* Burgenland */
+			
+			var burgenland=L.layerGroup().addTo(map);
+			
+			var x=new XMLHttpRequest();                                
+			x.open('get','burgenland_telepulesek_PGI.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var burgenland1=L.geoJSON(d, {className: 'szinvalto', weight: 0.2, color: "black", fillOpacity:0}).addTo(burgenland).bindPopup(popupAusztria);
+						
+			var x=new XMLHttpRequest();                                
+			x.open('get','Burgenland_jarasok.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var burgenland2=L.geoJSON(d, {weight: 0.6, color: "black"}).addTo(burgenland);
+						
+			var x=new XMLHttpRequest();                                
+			x.open('get','Burgenland_tartomanyhatar.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var burgenland3=L.geoJSON(d, {weight: 1, color: "black"}).addTo(burgenland);
+			
+			var x=new XMLHttpRequest();                                
+			x.open('get','Burgenland_orszaghatar.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var burgenland4=L.geoJSON(d, {weight: 1.2, color: "black"}).addTo(burgenland);
+									
+			/*Burgenland vége*/
+						
+			
+			/* Szlovénia / Muravidék */
+						
+			var muravidek=L.layerGroup().addTo(map);
+			
+			var x=new XMLHttpRequest();                                
+			x.open('get','Szlovenia.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var muravidek1=L.geoJSON(d, {className: 'szinvalto', weight: 0.2, color: "black", fillOpacity:0}).addTo(muravidek).bindPopup(popupSzlovenia);
+			
+			var x=new XMLHttpRequest();                                
+			x.open('get','Szlovenia_regiohatar.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var muravidek2=L.geoJSON(d, {weight: 1, color: "black"}).addTo(muravidek);
+			
+			var x=new XMLHttpRequest();                                
+			x.open('get','Szlovenia_orszaghatar.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var muravidek3=L.geoJSON(d, {weight: 1.2, color: "black"}).addTo(muravidek);
+						
+			/* Szlovénia / Muravidék vége */
+						
+			
+			/* Muraköz, Drávaköz */
+			
+			var murakoz_dravakoz=L.layerGroup().addTo(map);
+			var x=new XMLHttpRequest();                                
+			x.open('get','murakoz_dravakoz_jo.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var murakoz_dravakoz1=L.geoJSON(d, {className: 'szinvalto', weight: 0.2, color: "black", fillOpacity:0}).addTo(murakoz_dravakoz).bindPopup(popupHorvatorszag);
+						
+			var x=new XMLHttpRequest();                                
+			x.open('get','murakoz_dravakoz_megyehatar.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var murakoz_dravakoz2=L.geoJSON(d, {weight: 1, color: "black"}).addTo(murakoz_dravakoz);
+						
+			var x=new XMLHttpRequest();                                
+			x.open('get','murakoz_dravakoz_orszaghatar.json',false);
+			x.send();
+			var d=JSON.parse(x.responseText);
+			var murakoz_dravakoz3=L.geoJSON(d, {weight: 1.2, color: "black"}).addTo(murakoz_dravakoz);
+						
+			/* Muraköz, Drávaköz megye vége */
+			
+						
+			function modszervalt(modszer) {
+                if (modszer=='int') {
+                    tematikus.clearLayers();
+					burgenlandintezmeny.addTo(tematikus);
+					burgenlandintezmenymikro.addTo(tematikus);
+					burgenlandintezmenytomb.addTo(tematikus);
+					
+                    erdelyintezmeny.addTo(tematikus);
+					erdelyintezmenymikro.addTo(tematikus);
+					erdelyintezmenytomb.addTo(tematikus);
+										
+                    szlovakiaintezmeny.addTo(tematikus);
+					szlovakiaintezmenymikro.addTo(tematikus);
+					szlovakiaintezmenytomb.addTo(tematikus);
+					
+                    /*szloveniaintezmeny.addTo(tematikus);*/
+					
+					karpataljaintezmeny.addTo(tematikus);
+					karpataljaintezmenytomb.addTo(tematikus);
+					karpataljaintezmenymikro.addTo(tematikus);
+										
+					vajdasagintezmeny.addTo(tematikus);
+					vajdasagintezmenymikro.addTo(tematikus);
+					vajdasagintezmenytomb.addTo(tematikus);
+				}				
+				if (modszer=='nhusz') {
+					/*burgenlandn.addTo(tematikus);*/
+					tematikus.clearLayers();
+					erdelyn.addTo(tematikus);
+					erdelytomb.addTo(tematikus);
+					erdelymikro.addTo(tematikus);
+							
+					szlovakian.addTo(tematikus);
+					szlovakiat.addTo(tematikus);
+					szlovakiamikro.addTo(tematikus);
+										
+					szlovenian.addTo(tematikus);
+					szloveniamikro.addTo(tematikus);
+					szloveniatomb.addTo(tematikus);
+										
+					karpataljan.addTo(tematikus);
+					karpataljatomb.addTo(tematikus);
+					karpataljamikro.addTo(tematikus);
+					
+					vajdasagn.addTo(tematikus);
+					vajdasagmikro.addTo(tematikus);
+					vajdasagtomb.addTo(tematikus);
+										
+					murakozdravakozn.addTo(tematikus);
+					murakozdravakozmikro.addTo(tematikus);
+					murakozdravakoztomb.addTo(tematikus);					
+				} 				
+				if (modszer=='ahusz') {
+					tematikus.clearLayers();
+					erdelya.addTo(tematikus);
+					erdelyamikro.addTo(tematikus);
+					erdelyatomb.addTo(tematikus);
+					
+					szlovakiaa.addTo(tematikus);
+					szlovakiaamikro.addTo(tematikus);
+					szlovakiaatomb.addTo(tematikus);
+					
+					szloveniaa.addTo(tematikus);
+					szloveniaamikro.addTo(tematikus);
+					szloveniaatomb.addTo(tematikus);
+										
+					karpataljaa.addTo(tematikus);
+					karpataljaamikro.addTo(tematikus);
+					karpataljaatomb.addTo(tematikus);
+										
+					vajdasaga.addTo(tematikus);
+					vajdasagamikro.addTo(tematikus);
+					vajdasagatomb.addTo(tematikus);
+					
+					murakozdravakoza.addTo(tematikus);
+					murakozdravakozamikro.addTo(tematikus);
+					murakozdravakozatomb.addTo(tematikus);					
+				}
+				if (modszer=='anh') {
+					tematikus.clearLayers();
+					erdelyanh.addTo(tematikus);
+					erdelyanhmikro.addTo(tematikus);
+					erdelyanhtomb.addTo(tematikus);
+										
+					szlovakiaanh.addTo(tematikus);
+					szlovakiaanhmikro.addTo(tematikus);
+					szlovakiaanhtomb.addTo(tematikus);
+					
+					karpataljaanh.addTo(tematikus);
+					karpataljaanhmikro.addTo(tematikus);
+					karpataljaanhtomb.addTo(tematikus);
+					
+					vajdasaganh.addTo(tematikus);
+					vajdasaganhmikro.addTo(tematikus);
+					vajdasaganhtomb.addTo(tematikus);
+										
+					murakozdravakozanh.addTo(tematikus);
+					murakozdravakozanhmikro.addTo(tematikus);
+					
+					szloveniaanhmikro.addTo(tematikus);
+					szloveniaanhtomb.addTo(tematikus);
+				}
+				if (modszer=='30_300_n') {
+					tematikus.clearLayers();
+					erdely30_300_n.addTo(tematikus);
+					erdely30_300_n_mikro.addTo(tematikus);
+					erdely30_300_n_tomb.addTo(tematikus);
+					
+					szlovakia30_300_n.addTo(tematikus);
+					szlovakia30_300_n_mikro.addTo(tematikus);
+					szlovakia30_300_n_tomb.addTo(tematikus);
+					
+					karpatalja30_300_n.addTo(tematikus);
+					karpatalja30_300_n_mikro.addTo(tematikus);
+					karpatalja30_300_n_tomb.addTo(tematikus);
+					
+					vajdasag30_300_n.addTo(tematikus);
+					vajdasag30_300_n_tomb.addTo(tematikus);
+					vajdasag30_300_n_mikro.addTo(tematikus);
+					
+					murakozdravakoz30_300_n.addTo(tematikus);
+					murakozdravakoz30_300_n_mikro.addTo(tematikus);
+					murakozdravakoz30_300_n_tomb.addTo(tematikus);
+					
+					szlovenia30_300_n.addTo(tematikus);
+					szlovenia30_300_n_mikro.addTo(tematikus);
+					szlovenia30_300_n_tomb.addTo(tematikus);
+					
+					/*burgenland30_300_n.addTo(tematikus);*/					
+				}
+
+				if (modszer=='30_300_a') {
+					tematikus.clearLayers();
+					erdely30_300_a.addTo(tematikus);
+					erdely30_300_a_mikro.addTo(tematikus);
+					erdely30_300_a_tomb.addTo(tematikus);
+					
+					szlovakia30_300_a.addTo(tematikus);
+					szlovakia30_300_a_mikro.addTo(tematikus);
+					szlovakia30_300_a_tomb.addTo(tematikus);
+					
+					karpatalja30_300_a.addTo(tematikus);
+					karpatalja30_300_a_mikro.addTo(tematikus);
+					karpatalja30_300_a_tomb.addTo(tematikus);
+					
+					vajdasag30_300_a.addTo(tematikus);
+					vajdasag30_300_a_mikro.addTo(tematikus);
+					vajdasag30_300_a_tomb.addTo(tematikus);
+										
+					murakozdravakoz30_300_a.addTo(tematikus);
+					murakozdravakoz30_300_a_tomb.addTo(tematikus);
+					murakozdravakoz30_300_a_mikro.addTo(tematikus);
+										
+					szlovenia30_300_a.addTo(tematikus);
+					szlovenia30_300_a_mikro.addTo(tematikus);
+					szlovenia30_300_a_tomb.addTo(tematikus);
+					
+				}		
+				
+				if (modszer=='alap') {
+					tematikus.clearLayers();
+				}
+
+                szlovakia2.bringToFront();
+                szlovakia3.bringToFront();
+                szlovakia4.bringToFront();
+				karpatalja2.bringToFront();
+				karpatalja3.bringToFront();
+				karpatalja4.bringToFront();
+                romania2.bringToFront();
+                romania3.bringToFront();
+				vajdasag2.bringToFront();
+				vajdasag3.bringToFront();
+				vajdasag4.bringToFront();
+				murakoz_dravakoz2.bringToFront();
+				murakoz_dravakoz3.bringToFront();
+				muravidek2.bringToFront();
+				muravidek3.bringToFront();
+				burgenland2.bringToFront();
+				burgenland3.bringToFront();
+				burgenland4.bringToFront();				
+            } 
+																			
+			var alap={
+				"OpenStreetMap": osm,				
+				"Google Terrain": googleTerrain,
+				"Google műhold": googleSat,
+			}
+						
+			var fedveny={
+				
+				'Felvidék (Szlovákia)': szlovakia,
+				'Erdély (Románia)': romania,
+				'Kárpátalja (Ukrajna)': karpatalja,
+				'Vajdaság (Szerbia)': vajdasag,
+				'Őrvidék (Ausztria)': burgenland,
+				'Muravidék (Szlovénia)': muravidek,
+				'Muraköz; Drávaköz megye (Horvátország)': murakoz_dravakoz,
+			}
+			L.control.layers(alap,fedveny).addTo(map);
+								
+		</script>
+	</body>
+</html>
