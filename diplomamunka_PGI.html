@@ -34,10 +34,7 @@
 				border: solid 2px black;
 			}
 			
-			#legend {
-				position: absolute;
-				bottom: 0; left: 0;
-			}
+			
 			
 			
 			.leaflet-popup-content-wrapper,	
@@ -73,6 +70,29 @@
                 fill: yellow;
                 fill-opacity: 0.7;
             }
+
+	    .legend {
+		padding: 6px 8px;
+		font: 14px/16px Arial, Helvetica, sans-serif;
+		background: white;
+		background: rgba(255,255,255,0.8);
+		box-shadow: 0 0 15px rgba(0,0,0,0.2);
+		border-radius: 5px;
+		line-height: 18px;
+		color: #555;
+		  
+		// kérdéses rész//
+		position: absolute;
+		bottom: 0; left: 0;
+	    }
+
+	    .legend i {
+		width: 18px;
+		height: 18px;
+		float: left;
+		margin-right: 8px;
+		opacity: 0.7;
+	    }			
 			
 		
 	
@@ -88,15 +108,7 @@
 			<input type="button" value="Keresés" onclick="keres()" />					
 		</div>
 		
-		<div id="legend">
-			<svg height= "120" width="200">
-				<rect x="10" y="10" height="30" width="50" style="stroke-width: 4;
-					stroke: black; fill: red; fill-opacity:0.5;"/>
-				<text x="70" y="102" style="font-family: sans-serif; font-size:12px;">
-					Szórvány
-				</text>
-			</svg>
-		</div>
+		
 		
 		
 		<!--label for="modszer" placeholder="Szórványlehatárolási módszer">Szórványlehatárolási módszer:</label-->
@@ -1315,7 +1327,27 @@
 			}
 			
 			
-	 legend.bringToFront();	
+			// Define your legend items and colors
+			var legendItems = {
+			  "Tömbtelepülés": "#728FCE",
+			  "Szórványtelepülés": "red",
+			  "Mikroszórvány/ nem él magyar": "#FFFFFF"
+			};
+
+			// Create a custom control for the legend
+			var legend = L.control({position: 'bottomright'});
+			legend.onAdd = function (map) {
+			  var div = L.DomUtil.create('div', 'legend');
+			  for (var key in legendItems) {
+			    div.innerHTML += '<i style="background:' + legendItems[key] + '"></i> ' + key + '<br>';
+			  }
+			  return div;
+			};	 
+			
+			
+			
+			
+
 						
 			var fedveny={
 				
@@ -1328,7 +1360,9 @@
 				'Muraköz; Drávaköz megye (Horvátország)': murakoz_dravakoz,
 			}
 			L.control.layers(alap,fedveny).addTo(map);
-								
+			legend.addTo(map);
+			
+			
 		</script>
 	</body>
 </html>
